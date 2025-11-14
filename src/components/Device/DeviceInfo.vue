@@ -53,7 +53,7 @@ const deviceInfo = ref({
 });
 
 async function executeShellCommand(device: Adb, command: string): Promise<string> {
-    const subprocess = await device.subprocess.shell(command);
+    const subprocess = await device.subprocess.shellProtocol!.spawn(command);
     const reader = subprocess.stdout.getReader();
     let result = '';
     let done = false;
@@ -70,7 +70,7 @@ async function executeShellCommand(device: Adb, command: string): Promise<string
         reader.releaseLock();
     }
 
-    await subprocess.exit;
+    await subprocess.exited;
     return result.trim();
 }
 

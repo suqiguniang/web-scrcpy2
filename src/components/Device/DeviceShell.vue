@@ -2,9 +2,9 @@
 import { ref, onMounted } from 'vue';
 import { encodeUtf8 } from '@yume-chan/adb';
 import client from '../Scrcpy/adb-client';
-import { Terminal } from 'xterm';
-import { FitAddon } from 'xterm-addon-fit';
-import 'xterm/css/xterm.css';
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import '@xterm/xterm/css/xterm.css';
 
 const term = ref<HTMLDivElement | null>(null);
 
@@ -61,13 +61,13 @@ async function startTerminal() {
         return;
     }
 
-    const process = await client.device?.subprocess.shell();
+    const process = await client.device?.subprocess.shellProtocol!.pty();
     if (!process) {
         console.error('获取 subprocess 失败');
         return;
     }
 
-    process.stdout
+    process.output
         .pipeTo(
             new WritableStream({
                 write(chunk) {
@@ -79,7 +79,7 @@ async function startTerminal() {
             console.error('输出流错误:', error);
         });
 
-    const writer = process.stdin.getWriter();
+    const writer = process.input.getWriter();
     terminal.onData((data) => {
         const buffer = encodeUtf8(data);
         writer.write(buffer).catch((error) => {

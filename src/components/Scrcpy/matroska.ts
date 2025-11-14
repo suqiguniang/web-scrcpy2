@@ -141,9 +141,9 @@ const MatroskaVideoCodecNameMap: Record<ScrcpyVideoCodecId, string> = {
 };
 
 const MatroskaAudioCodecNameMap: Record<string, string> = {
-    [ScrcpyAudioCodec.RAW.mimeType]: 'A_PCM/INT/LIT',
-    [ScrcpyAudioCodec.AAC.mimeType]: 'A_AAC',
-    [ScrcpyAudioCodec.OPUS.mimeType]: 'A_OPUS',
+    [ScrcpyAudioCodec.Raw.mimeType]: 'A_PCM/INT/LIT',
+    [ScrcpyAudioCodec.Aac.mimeType]: 'A_AAC',
+    [ScrcpyAudioCodec.Opus.mimeType]: 'A_OPUS',
 };
 
 export class MatroskaMuxingRecorder {
@@ -273,7 +273,7 @@ export class MatroskaMuxingRecorder {
                     codec: MatroskaAudioCodecNameMap[this.audioCodec.mimeType!],
                     sampleRate: 48000,
                     numberOfChannels: 2,
-                    bitDepth: this.audioCodec === ScrcpyAudioCodec.RAW ? 16 : undefined,
+                    bitDepth: this.audioCodec === ScrcpyAudioCodec.Raw ? 16 : undefined,
                 };
             }
 

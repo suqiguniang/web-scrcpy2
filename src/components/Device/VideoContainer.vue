@@ -53,8 +53,8 @@ const handleWheel = (e: WheelEvent) => {
 
     const { x, y } = state.clientPositionToDevicePosition(e.clientX, e.clientY);
     state.scrcpy?.controller!.injectScroll({
-        screenWidth: state.width!,
-        screenHeight: state.height!,
+        videoWidth: state.width!,
+        videoHeight: state.height!,
         pointerX: x,
         pointerY: y,
         scrollX: -e.deltaX / 100,
@@ -64,7 +64,7 @@ const handleWheel = (e: WheelEvent) => {
 };
 
 const injectTouch = (action: AndroidMotionEventAction, e: PointerEvent) => {
-    if (!isReady.value || !state.hoverHelper || !isPointInCanvas(e.clientX, e.clientY)) {
+    if (!isReady.value || !isPointInCanvas(e.clientX, e.clientY)) {
         return;
     }
 
@@ -74,18 +74,18 @@ const injectTouch = (action: AndroidMotionEventAction, e: PointerEvent) => {
 
     const { x, y } = state.clientPositionToDevicePosition(e.clientX, e.clientY);
 
-    const messages = state.hoverHelper.process({
+    const message = {
         action,
         pointerId,
-        screenWidth: state.width!,
-        screenHeight: state.height!,
+        videoWidth: state.width!,
+        videoHeight: state.height!,
         pointerX: x,
         pointerY: y,
         pressure: e.pressure,
         actionButton: MOUSE_EVENT_BUTTON_TO_ANDROID_BUTTON[e.button],
         buttons: e.buttons,
-    });
-    messages.forEach((message) => state.scrcpy?.controller?.injectTouch(message));
+    };
+    state.scrcpy?.controller?.injectTouch(message)
 };
 
 const handlePointerDown = (e: PointerEvent) => {

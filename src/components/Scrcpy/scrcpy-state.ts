@@ -1,19 +1,15 @@
 // 导入外部依赖
 import { AdbDaemonWebUsbDevice } from '@yume-chan/adb-daemon-webusb';
-import { AdbScrcpyClient, AdbScrcpyOptionsLatest } from '@yume-chan/adb-scrcpy';
-import { VERSION } from '@yume-chan/fetch-scrcpy-server';
+import { AdbScrcpyClient, AdbScrcpyOptionsLatest, AdbScrcpyOptions3_3_3 } from '@yume-chan/adb-scrcpy';
+// import { VERSION, BIN } from '@yume-chan/fetch-scrcpy-server';
 import { PcmPlayer } from '@yume-chan/pcm-player';
 import {
     clamp,
-    CodecOptions,
+    ScrcpyCodecOptions,
     h264ParseConfiguration,
-    ScrcpyHoverHelper,
     ScrcpyInstanceId,
-    ScrcpyLogLevel,
-    ScrcpyOptionsLatest,
     ScrcpyVideoCodecId,
-    ScrcpyVideoOrientation,
-    DEFAULT_SERVER_PATH,
+    DefaultServerPath,
 } from '@yume-chan/scrcpy';
 import type {
     ScrcpyMediaStreamPacket,
@@ -21,14 +17,20 @@ import type {
     ScrcpyMediaStreamDataPacket,
 } from '@yume-chan/scrcpy';
 import { Consumable, InspectStream, ReadableStream, WritableStream } from '@yume-chan/stream-extra';
-import { WebCodecsVideoDecoder } from '@yume-chan/scrcpy-decoder-webcodecs';
+import type { VideoFrameRenderer } from "@yume-chan/scrcpy-decoder-webcodecs";
+import {
+    WebCodecsVideoDecoder,
+    WebGLVideoFrameRenderer,
+    BitmapVideoFrameRenderer,
+    InsertableStreamVideoFrameRenderer,
+} from "@yume-chan/scrcpy-decoder-webcodecs";
 
 // 导入本地依赖
 import { ScrcpyKeyboardInjector } from './input';
 import recorder from './recorder';
 
 // @ts-ignore
-import SCRCPY_SERVER_BIN from '../../../public/scrcpy-server-v2.6.1?binary';
+import SCRCPY_SERVER_BIN from '../../../public/scrcpy-server-v3.3.3?binary';
 
 // 类型定义
 type RotationListener = (rotation: number, prevRotation: number) => void;
@@ -47,7 +49,7 @@ export class ScrcpyState {
     running = false;
     fullScreenContainer: HTMLDivElement | null = null;
     rendererContainer: HTMLDivElement | null = null;
-    canvas?: HTMLCanvasElement;
+    canvas?: HTMLVideoElement | HTMLCanvasElement;
     isFullScreen = false;
     width = 0;
     height = 0;
@@ -59,14 +61,12 @@ export class ScrcpyState {
     videoBitRate = DEFAULT_BITRATE;
     maxSize = DEFAULT_MAX_SIZE;
     maxFps = DEFAULT_FPS;
-    lockVideoOrientation = ScrcpyVideoOrientation.Unlocked;
     displayId = DEFAULT_DISPLAY_ID;
     powerOn = DEFAULT_POWER_ON;
 
     // 设备和连接相关
     device: AdbDaemonWebUsbDevice | undefined = undefined;
-    scrcpy: AdbScrcpyClient | undefined = undefined;
-    hoverHelper: ScrcpyHoverHelper | undefined = undefined;
+    scrcpy: AdbScrcpyClient<AdbScrcpyOptions3_3_3<boolean>> | undefined = undefined;
     keyboard: ScrcpyKeyboardInjector | undefined = undefined;
     audioPlayer: PcmPlayer<unknown> | undefined = undefined;
 
@@ -243,29 +243,25 @@ export class ScrcpyState {
             }
             this.connecting = true;
             await this.pushServer();
-            const videoCodecOptions = new CodecOptions();
-            const options = new AdbScrcpyOptionsLatest(
-                new ScrcpyOptionsLatest({
-                    maxSize: this.maxSize,
-                    videoBitRate: this.videoBitRate,
-                    videoCodec: this.videoCodec,
-                    maxFps: this.maxFps,
-                    lockVideoOrientation: this.lockVideoOrientation,
-                    displayId: this.displayId,
-                    powerOn: this.powerOn,
-                    audio: false, // 禁用音频
-                    logLevel: ScrcpyLogLevel.Debug,
-                    scid: ScrcpyInstanceId.random(),
-                    sendDeviceMeta: false,
-                    sendDummyByte: false,
-                    videoCodecOptions,
-                })
-            );
+            const videoCodecOptions = new ScrcpyCodecOptions();
+            const options = new AdbScrcpyOptions3_3_3({
+                maxSize: this.maxSize,
+                videoBitRate: this.videoBitRate,
+                videoCodec: this.videoCodec,
+                maxFps: this.maxFps,
+                displayId: this.displayId,
+                powerOn: this.powerOn,
+                audio: false, // 禁用音频
+                logLevel: 'debug',
+                scid: ScrcpyInstanceId.random(),
+                sendDeviceMeta: false,
+                sendDummyByte: false,
+                videoCodecOptions,
+            });
 
             this.scrcpy = await AdbScrcpyClient.start(
                 this.device as any,
-                DEFAULT_SERVER_PATH,
-                VERSION,
+                DefaultServerPath,
                 options
             );
 
@@ -273,7 +269,7 @@ export class ScrcpyState {
                 throw new Error('启动 scrcpy 客户端失败');
             }
 
-            this.scrcpy.stdout.pipeTo(
+            this.scrcpy.output.pipeTo(
                 new WritableStream<string>({
                     write(chunk) {
                         console.log(`[服务器] ${chunk}`);
@@ -350,8 +346,7 @@ export class ScrcpyState {
             }
 
             this.keyboard = new ScrcpyKeyboardInjector(this.scrcpy);
-            this.hoverHelper = new ScrcpyHoverHelper();
-            this.scrcpy.exit.then(() => this.dispose());
+            this.scrcpy.exited.then(() => this.dispose());
 
             this.running = true;
             return this.scrcpy;
@@ -396,11 +391,30 @@ export class ScrcpyState {
         this.rotationListeners = [];
     }
 
+    // 创建视频帧渲染器
+    createVideoFrameRenderer(): {
+        renderer: VideoFrameRenderer;
+        element: HTMLVideoElement | HTMLCanvasElement;
+    } {
+        if (InsertableStreamVideoFrameRenderer.isSupported) {
+          const renderer = new InsertableStreamVideoFrameRenderer();
+          return { renderer, element: renderer.element as HTMLVideoElement };
+        }
+
+        if (WebGLVideoFrameRenderer.isSupported) {
+            const renderer = new WebGLVideoFrameRenderer();
+            return { renderer, element: renderer.canvas as HTMLCanvasElement };
+        }
+
+        const renderer = new BitmapVideoFrameRenderer();
+        return { renderer, element: renderer.canvas as HTMLCanvasElement };
+    }
+
     setRendererContainer(container: HTMLDivElement): void {
         if (this.decoder?.renderer) {
             console.log('渲染器容器已更改', this.decoder);
             this.rendererContainer = null;
-            container.removeChild(this.decoder.renderer);
+            container.removeChild(this.canvas);
         }
 
         this.fullScreenContainer = container;
@@ -411,14 +425,18 @@ export class ScrcpyState {
         container.style.overflow = 'hidden';
         container.style.backgroundColor = 'transparent';
 
-        this.decoder = new WebCodecsVideoDecoder(ScrcpyVideoCodecId.H264, false);
-        container.appendChild(this.decoder.renderer);
-        this.canvas = this.decoder.renderer;
+        const { renderer, element } = this.createVideoFrameRenderer();
+        this.decoder = new WebCodecsVideoDecoder({
+            codec: ScrcpyVideoCodecId.H264,
+            renderer,
+        });
+        container.appendChild(element);
+        this.canvas = element;
         // 初始化视频容器
         this.updateVideoContainer();
     }
 
-    getCanvas(): HTMLCanvasElement | undefined {
+    getCanvas(): HTMLVideoElement | HTMLCanvasElement | undefined {
         if (!this.scrcpy) {
             return;
         }

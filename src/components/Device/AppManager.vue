@@ -161,9 +161,9 @@
           确认卸载
         </v-card-title>
         <v-card-text>
-          确定要卸载 <strong>{{ selectedApp?.appName }}</strong> 吗？
+          确定要卸载 <strong>{{ selectedApp?.[0]?.appName }}</strong> 吗？
           <div class="text-caption mt-2">
-            包名: {{ selectedApp?.packageName }}
+            包名: {{ selectedApp?.[0]?.packageName }}
           </div>
         </v-card-text>
         <v-card-actions>
@@ -179,7 +179,7 @@
             color="error"
             variant="tonal"
             @click="confirmUninstall"
-            :loading="selectedApp?.uninstalling"
+            :loading="selectedApp?.[0]?.uninstalling"
           >
             卸载
           </v-btn>
@@ -226,7 +226,7 @@ const refreshAppList = async () => {
     const appList: ExtendedPackageInfo[] = [];
     
     // 使用 spawnAndWaitLegacy 方法执行命令
-    const output = await client.device.subprocess.spawnAndWaitLegacy([
+    const output = await client.device.subprocess.noneProtocol!.spawnWaitText([
       'pm', 
       'list', 
       'packages', 
@@ -275,7 +275,7 @@ const confirmUninstall = async () => {
   try {
     selectedApp.value[0].uninstalling = true;
     
-    const output = await client.device.subprocess.spawnAndWaitLegacy([
+    const output = await client.device.subprocess.noneProtocol!.spawnWaitText([
       'pm',
       'uninstall',
       selectedApp.value[0].packageName
@@ -316,7 +316,7 @@ const launchApp = async (app: ExtendedPackageInfo) => {
   if (!client.device) return;
   
   try {
-    await client.device.subprocess.spawnAndWaitLegacy([
+    await client.device.subprocess.noneProtocol!.spawnWait([
       'monkey',
       '-p',
       app.packageName,
@@ -353,7 +353,7 @@ const exportApk = async (app: ExtendedPackageInfo) => {
     const tempDir = '/data/local/tmp';
     const tempFile = `${tempDir}/${app.packageName}.apk`;
     
-    await client.device.subprocess.spawnAndWaitLegacy([
+    await client.device.subprocess.noneProtocol!.spawnWait([
       'cp',
       sourceDir,
       tempFile
@@ -378,7 +378,7 @@ const exportApk = async (app: ExtendedPackageInfo) => {
         exportProgress.value = (receivedLength / totalSize) * 100;
       }
       
-      const blob = new Blob(chunks, { type: 'application/vnd.android.package-archive' });
+      const blob = new Blob(chunks as BlobPart[], { type: 'application/vnd.android.package-archive' });
       saveAs(blob, `${app.packageName}.apk`);
       
       errorType.value = 'success';
@@ -386,7 +386,7 @@ const exportApk = async (app: ExtendedPackageInfo) => {
       errorMessage.value = 'APK导出成功';
     } finally {
       await sync.dispose();
-      await client.device.subprocess.spawnAndWaitLegacy([
+      await client.device.subprocess.noneProtocol!.spawnWait([
         'rm',
         tempFile
       ]);
