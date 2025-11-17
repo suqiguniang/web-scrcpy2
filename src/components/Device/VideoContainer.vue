@@ -23,13 +23,12 @@ const MOUSE_EVENT_BUTTON_TO_ANDROID_BUTTON = [
     AndroidMotionEventButton.Forward,
 ];
 
-const isReady = computed(
-    () =>
-        state.scrcpy &&
-        state.canvas &&
-        isVideoContainerFocused.value &&
-        isCanvasReady.value &&
-        isFullyRendered.value
+const isReady = () => (
+    !!state.scrcpy &&
+    !!state.canvas &&
+    isVideoContainerFocused.value &&
+    isCanvasReady.value &&
+    isFullyRendered.value
 );
 
 const isPointInCanvas = (clientX: number, clientY: number): boolean => {
@@ -44,7 +43,7 @@ const isPointInCanvas = (clientX: number, clientY: number): boolean => {
 };
 
 const handleWheel = (e: WheelEvent) => {
-    if (!isReady.value || !isPointInCanvas(e.clientX, e.clientY)) {
+    if (!isReady() || !isPointInCanvas(e.clientX, e.clientY)) {
         return;
     }
     videoContainer.value?.focus();
@@ -64,7 +63,7 @@ const handleWheel = (e: WheelEvent) => {
 };
 
 const injectTouch = (action: AndroidMotionEventAction, e: PointerEvent) => {
-    if (!isReady.value || !isPointInCanvas(e.clientX, e.clientY)) {
+    if (!isReady() || !isPointInCanvas(e.clientX, e.clientY)) {
         return;
     }
 
@@ -89,7 +88,7 @@ const injectTouch = (action: AndroidMotionEventAction, e: PointerEvent) => {
 };
 
 const handlePointerDown = (e: PointerEvent) => {
-    if (!isReady.value || !isPointInCanvas(e.clientX, e.clientY)) return;
+    if (!isReady() || !isPointInCanvas(e.clientX, e.clientY)) return;
 
     state.fullScreenContainer?.focus();
     e.preventDefault();
@@ -100,7 +99,7 @@ const handlePointerDown = (e: PointerEvent) => {
 };
 
 const handlePointerMove = (e: PointerEvent) => {
-    if (!isReady.value || !isPointInCanvas(e.clientX, e.clientY)) return;
+    if (!isReady() || !isPointInCanvas(e.clientX, e.clientY)) return;
 
     e.preventDefault();
     e.stopPropagation();
@@ -111,7 +110,7 @@ const handlePointerMove = (e: PointerEvent) => {
 };
 
 const handlePointerUp = (e: PointerEvent) => {
-    if (!isReady.value || !isPointInCanvas(e.clientX, e.clientY)) return;
+    if (!isReady() || !isPointInCanvas(e.clientX, e.clientY)) return;
 
     e.preventDefault();
     e.stopPropagation();
@@ -119,7 +118,7 @@ const handlePointerUp = (e: PointerEvent) => {
 };
 
 const handlePointerLeave = (e: PointerEvent) => {
-    if (!isReady.value || !isPointInCanvas(e.clientX, e.clientY)) return;
+    if (!isReady() || !isPointInCanvas(e.clientX, e.clientY)) return;
 
     e.preventDefault();
     e.stopPropagation();
@@ -128,7 +127,7 @@ const handlePointerLeave = (e: PointerEvent) => {
 };
 
 const handleContextMenu = (e: MouseEvent) => {
-    if (!isReady.value || !isPointInCanvas(e.clientX, e.clientY)) return;
+    if (!isReady() || !isPointInCanvas(e.clientX, e.clientY)) return;
     e.preventDefault();
 };
 
@@ -139,7 +138,7 @@ const sanitizeText = (text: string): string => {
 };
 
 const handlePaste = async () => {
-    if (!isReady.value || !state.scrcpy || !state.scrcpy.controller) return;
+    if (!isReady() || !state.scrcpy || !state.scrcpy.controller) return;
     try {
         const clipboardText = await navigator.clipboard.readText();
         const sanitizedText = sanitizeText(clipboardText);
@@ -158,7 +157,7 @@ const handlePaste = async () => {
 };
 
 const handleKeyEvent = (e: KeyboardEvent) => {
-    if (!isReady.value || !state.keyboard) return;
+    if (!isReady() || !state.keyboard) return;
     e.preventDefault();
     e.stopPropagation();
 
