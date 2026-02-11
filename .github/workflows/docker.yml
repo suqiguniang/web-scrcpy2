@@ -1,19 +1,18 @@
-# Workflow for building Vue app and pushing Docker image with nginx HTTPS
-name: Build and Push Docker Image
+# Workflow for building Vue dev + nginx HTTPS proxy Docker image
+name: Build and Push Docker Image + Artifact
 
 on:
   push:
     branches: ["main"]
   workflow_dispatch:
 
-# 赋予 GITHUB_TOKEN 读取代码和写入包（ghcr.io）的权限
 permissions:
   contents: read
   packages: write
   id-token: write
 
 concurrency:
-  group: "docker"
+  group: "docker-dev"
   cancel-in-progress: false
 
 jobs:
@@ -22,18 +21,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Vue app
-        run: npm run build
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -45,13 +32,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # --- 构建并推送镜像到 ghcr.io，同时加载到本地 Docker daemon ---
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .                     # 使用仓库根目录（包含 Dockerfile）
-          push: true                    # 推送到 registry
+          context: .
+          push: true
+          load: true                 # ✅ 将镜像加载到本地，用于后续保存
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ github.sha }}
-          cache-from: type=gha          # 使用 GitHub Actions 缓存加速
+          cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # --- 将镜像保存为压缩 tar 文件，以便作为 Artifact 下载 ---
+      - name: Save Docker image as artifact
+        run: |
+          docker save ghcr.io/${{ github.repository }}:${{ github.sha }} | gzip > image.tar.gz
+
+      # --- 上传 Artifact，可在 Actions 运行结果页面直接下载 ---
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: image.tar.gz
+          retention-days: 7          # 可选，保留天数
